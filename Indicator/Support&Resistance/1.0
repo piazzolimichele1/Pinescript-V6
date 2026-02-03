@@ -1,0 +1,173 @@
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     INDICATOR HEADER
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//@version=6
+indicator("Support Resistance - Michele Piazzoli", overlay=true, max_bars_back=600, max_lines_count=500, max_labels_count=500)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     PIVOT SETTINGS INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+rb = input.int(10, "Period for Pivot Points", minval=10, group='Pivot Settings')  // Number of bars on each side to confirm a pivot high or low
+prd = input.int(284, "Lookback Period", minval=100, maxval=500, group='Pivot Settings')  // Total number of bars to scan for pivot points
+nump = input.int(2, "S/R Strength", minval=1, group='Pivot Settings')  // Minimum number of pivot points required within a channel to validate a S/R level
+ChannelW = input.int(10, "Channel Width %", minval=5, group='Pivot Settings')  // Width of the price channel as percentage of the lookback period range
+showpp = input.bool(false, "Show Pivot Points", group='Pivot Settings')  // Toggle visibility of PH/PL labels on chart
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DISPLAY SETTINGS INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+label_location = input.int(10, "Label Location +-", tooltip="0 means last bar. Negative values shift left, positive shift to future bars", group='Display Settings')  // Horizontal offset for S/R labels relative to last bar
+linestyle = input.string('Dashed', "Line Style", options=['Solid', 'Dotted', 'Dashed'], group='Display Settings')  // Visual style of S/R lines
+LineColor = input.color(color.blue, "Line Color", group='Display Settings')  // Color of S/R lines
+drawhl = input.bool(true, "Draw Highest/Lowest Pivots in Period", group='Display Settings')  // Toggle highest pivot high and lowest pivot low lines
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     PIVOT POINT DETECTION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+ph = ta.pivothigh(rb, rb)  // Detect pivot high using left and right bar count
+pl = ta.pivotlow(rb, rb)  // Detect pivot low using left and right bar count
+bool isPH = not na(ph)  // True when a pivot high is detected on current bar
+bool isPL = not na(pl)  // True when a pivot low is detected on current bar
+plotshape(isPH and showpp, text="PH", style=shape.labeldown, color=color.new(color.white, 100), textcolor=color.red, location=location.abovebar, offset=-rb)  // Plot pivot high label above bar
+plotshape(isPL and showpp, text="PL", style=shape.labelup, color=color.new(color.white, 100), textcolor=color.lime, location=location.belowbar, offset=-rb)  // Plot pivot low label below bar
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     S/R LEVEL ARRAYS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+sr_levels = array.new_float(21, na)  // Array to store up to 21 support/resistance price levels
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CHANNEL WIDTH CALCULATION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+prdhighest = ta.highest(prd)  // Highest price in the lookback period
+prdlowest = ta.lowest(prd)  // Lowest price in the lookback period
+cwidth = (prdhighest - prdlowest) * ChannelW / 100  // Channel width in price units based on percentage of total range
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     PIVOT AVAILABILITY TRACKING
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+aas = array.new_bool(41, true)  // Boolean array tracking which pivot points are still available (not yet assigned to a channel)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     PERSISTENT VARIABLES
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+u1 = 0.0  // Upper boundary of the current channel being evaluated
+u1 := nz(u1[1])  // Carry forward previous value
+d1 = 0.0  // Lower boundary of the current channel being evaluated
+d1 := nz(d1[1])  // Carry forward previous value
+highestph = 0.0  // Highest pivot high found in the lookback period
+highestph := highestph[1]  // Carry forward previous value
+lowestpl = 0.0  // Lowest pivot low found in the lookback period
+lowestpl := lowestpl[1]  // Carry forward previous value
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     S/R CALCULATION LOGIC
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+if isPH or isPL  // Recalculate all S/R levels when a new pivot point is detected
+    for x = 0 to array.size(sr_levels) - 1  // Clear all previous S/R levels
+        array.set(sr_levels, x, na)
+
+    highestph := prdlowest  // Reset highest pivot high to lowest possible value
+    lowestpl := prdhighest  // Reset lowest pivot low to highest possible value
+    countpp = 0  // Counter for pivot points found in the lookback period
+
+    for x = 0 to prd  // Scan all bars in the lookback period
+        if na(close[x])  // Stop if no data available
+            break
+        if not na(ph[x]) or not na(pl[x])  // Bar contains a pivot point
+            highestph := math.max(highestph, nz(ph[x], prdlowest), nz(pl[x], prdlowest))  // Update highest pivot
+            lowestpl := math.min(lowestpl, nz(ph[x], prdhighest), nz(pl[x], prdhighest))  // Update lowest pivot
+            countpp := countpp + 1  // Increment pivot counter
+            if countpp > 40  // Maximum pivot points reached
+                break
+            if array.get(aas, countpp)  // Pivot point is still available (not assigned to a channel)
+                upl = (not na(ph[x]) ? high[x + rb] : low[x + rb]) + cwidth  // Upper channel boundary around this pivot
+                dnl = (not na(ph[x]) ? high[x + rb] : low[x + rb]) - cwidth  // Lower channel boundary around this pivot
+                u1 := countpp == 1 ? upl : u1  // Store first pivot channel upper boundary
+                d1 := countpp == 1 ? dnl : d1  // Store first pivot channel lower boundary
+                tmp = array.new_bool(41, true)  // Temporary array to track which pivots fall within this channel
+                cnt = 0  // Inner pivot counter
+                tpoint = 0  // Number of pivots found within this channel
+
+                for xx = 0 to prd  // Scan all bars again to find pivots within the channel
+                    if na(close[xx])  // Stop if no data available
+                        break
+                    if not na(ph[xx]) or not na(pl[xx])  // Bar contains a pivot point
+                        chg = false  // Flag indicating this pivot is within the channel
+                        cnt := cnt + 1  // Increment inner pivot counter
+                        if cnt > 40  // Maximum pivot points reached
+                            break
+                        if array.get(aas, cnt)  // Pivot is still available
+                            if not na(ph[xx])  // Check pivot high against channel boundaries
+                                if high[xx + rb] <= upl and high[xx + rb] >= dnl  // Pivot high falls within the channel
+                                    tpoint := tpoint + 1  // Increment channel member count
+                                    chg := true  // Mark as used
+                            if not na(pl[xx])  // Check pivot low against channel boundaries
+                                if low[xx + rb] <= upl and low[xx + rb] >= dnl  // Pivot low falls within the channel
+                                    tpoint := tpoint + 1  // Increment channel member count
+                                    chg := true  // Mark as used
+                        if chg and cnt < 41  // Mark pivot as assigned to this channel in temporary array
+                            array.set(tmp, cnt, false)
+
+                if tpoint >= nump  // Channel contains enough pivot points to qualify as a S/R level
+                    for g = 0 to 40  // Mark all pivots in this channel as used in the main availability array
+                        if not array.get(tmp, g)  // Pivot was assigned to this channel
+                            array.set(aas, g, false)  // Remove from available pool
+                    if not na(ph[x]) and countpp < 21  // Store pivot high as S/R level
+                        array.set(sr_levels, countpp, high[x + rb])
+                    if not na(pl[x]) and countpp < 21  // Store pivot low as S/R level
+                        array.set(sr_levels, countpp, low[x + rb])
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     LINE DRAWING FUNCTION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+setline(level) =>  // Creates a horizontal line at the given price level with user-defined style
+    LineStyle = linestyle == 'Solid' ? line.style_solid : linestyle == 'Dotted' ? line.style_dotted : line.style_dashed  // Convert string input to line style constant
+    line.new(bar_index - 1, level, bar_index, level, color=LineColor, width=2, style=LineStyle, extend=extend.both)  // Draw line extending both directions
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DRAW S/R LINES AND HIGHEST/LOWEST LEVELS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+if isPH or isPL  // Redraw all lines when a new pivot is detected
+    var line highest_ = na  // Line for highest pivot high in the period
+    var line lowest_ = na  // Line for lowest pivot low in the period
+    line.delete(highest_)  // Delete previous highest line
+    line.delete(lowest_)  // Delete previous lowest line
+    if drawhl  // Draw highest/lowest lines if enabled
+        highest_ := line.new(bar_index - 1, highestph, bar_index, highestph, color=color.blue, style=line.style_dashed, width=1, extend=extend.both)  // Highest pivot high line
+        lowest_ := line.new(bar_index - 1, lowestpl, bar_index, lowestpl, color=color.blue, style=line.style_dashed, width=1, extend=extend.both)  // Lowest pivot low line
+
+    var sr_lines = array.new_line(21, na)  // Array to hold S/R line objects
+    for x = 0 to array.size(sr_lines) - 1  // Loop through all S/R level slots
+        line.delete(array.get(sr_lines, x))  // Delete previous line at this slot
+        if not na(array.get(sr_levels, x))  // If a valid S/R level exists at this slot
+            array.set(sr_lines, x, setline(array.get(sr_levels, x)))  // Draw new line and store reference
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     STORE S/R LEVELS FOR LABELS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var sr_levs = array.new_float(21, na)  // Persistent array holding current S/R levels for label placement
+if isPH or isPL  // Update stored levels when new pivot detected
+    for x = 0 to array.size(sr_levs) - 1  // Copy levels from calculation array to persistent array
+        array.set(sr_levs, x, array.get(sr_levels, x))
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DRAW LABELS AND DETECT BREAKOUTS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+label hlabel = na  // Label for highest pivot high
+label llabel = na  // Label for lowest pivot low
+label.delete(hlabel[1])  // Delete previous highest label
+label.delete(llabel[1])  // Delete previous lowest label
+var sr_labels = array.new_label(21, na)  // Array to hold S/R label objects
+bool resistance_broken = false  // Flag for resistance breakout detection
+bool support_broken = false  // Flag for support breakdown detection
+float r_s_level = na  // Price level of the broken S/R for alert
+
+for x = 0 to array.size(sr_labels) - 1  // Loop through all S/R label slots
+    label.delete(array.get(sr_labels, x))  // Delete previous label at this slot
+    if not na(array.get(sr_levs, x))  // If a valid S/R level exists at this slot
+        if close[1] <= array.get(sr_levs, x) and close > array.get(sr_levs, x)  // Price crossed above S/R level
+            resistance_broken := true  // Mark resistance as broken
+            r_s_level := array.get(sr_levs, x)  // Store broken level for alert
+        if close[1] >= array.get(sr_levs, x) and close < array.get(sr_levs, x)  // Price crossed below S/R level
+            support_broken := true  // Mark support as broken
+            r_s_level := array.get(sr_levs, x)  // Store broken level for alert
+        lab_loc = close >= array.get(sr_levs, x) ? label.style_label_up : label.style_label_down  // Label points up if price is above, down if below
+        array.set(sr_labels, x, label.new(x=bar_index + label_location, y=array.get(sr_levs, x), text=str.tostring(math.round_to_mintick(array.get(sr_levs, x))), color=color.lime, textcolor=color.black, style=lab_loc))  // Create label showing S/R price
+
+hlabel := drawhl ? label.new(x=bar_index + label_location + math.round(math.sign(label_location)) * 20, y=highestph, text="Highest PH " + str.tostring(highestph), color=color.silver, textcolor=color.black, style=label.style_label_down) : na  // Highest pivot high label
+llabel := drawhl ? label.new(x=bar_index + label_location + math.round(math.sign(label_location)) * 20, y=lowestpl, text="Lowest PL " + str.tostring(lowestpl), color=color.silver, textcolor=color.black, style=label.style_label_up) : na  // Lowest pivot low label
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     ALERT CONDITIONS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+plot(r_s_level, title="RS_level", display=display.none)  // Hidden plot used as reference for alert messages
+alertcondition(resistance_broken, title='Resistance Broken', message='Resistance Broken, Close Price: {{close}}, Resistance level = {{plot("RS_level")}}')  // Alert when price breaks above a resistance level
+alertcondition(support_broken, title='Support Broken', message='Support Broken, Close Price: {{close}}, Support level = {{plot("RS_level")}}')  // Alert when price breaks below a support level
