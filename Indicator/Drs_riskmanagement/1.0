@@ -1,0 +1,80 @@
+//@version=6
+indicator("Risk Management", overlay=true)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ACCOUNT SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+account_size = input.int(100000, "Account Size ($)", group="Account Settings")
+level_step = input.int(200, "Level Change Every ($)", group="Account Settings")
+max_risk = input.float(50, "Max Risk ($)", group="Account Settings")
+min_risk = input.float(25, "Min Risk ($)", group="Account Settings")
+base_risk = input.float(25, "Base Risk ($)", group="Account Settings")
+risk_increment = input.float(5, "Risk Increment per Level ($)", group="Account Settings")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DISPLAY SETTINGS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+levels_du = input.int(5, "DU Levels (above)", group="Display Settings")
+levels_dd = input.int(5, "DD Levels (below)", group="Display Settings")
+text_color = input.color(color.black, "Text Color", group="Display Settings")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TABLE SETUP
+// ═══════════════════════════════════════════════════════════════════════════════
+
+total_rows = levels_du + 1 + levels_dd + 1
+var table risk_table = table.new(position=position.top_right, columns=2, rows=total_rows, border_color=color.black, border_width=1)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HEADER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+table.cell(risk_table, 0, 0, "BALANCE", text_color=text_color, text_size=size.small)
+table.cell(risk_table, 1, 0, "RISK $", text_color=text_color, text_size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DU LEVELS (from highest to lowest)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+for i = 0 to levels_du - 1
+    row = i + 1
+    level_num = levels_du - i
+    
+    // Calculate balance for DU level
+    balance = account_size + (level_num * level_step)
+    
+    // Calculate risk amount for DU level
+    raw_risk = base_risk + (level_num * risk_increment)
+    risk = math.max(min_risk, math.min(max_risk, raw_risk))
+    
+    // Display row
+    table.cell(risk_table, 0, row, "$" + str.tostring(balance), text_color=text_color, text_size=size.small)
+    table.cell(risk_table, 1, row, "$" + str.tostring(risk), text_color=text_color, text_size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BASE LEVEL (starting balance)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+base_row = levels_du + 1
+table.cell(risk_table, 0, base_row, "$" + str.tostring(account_size), text_color=text_color, bgcolor=color.new(color.yellow, 70), text_size=size.small)
+table.cell(risk_table, 1, base_row, "$" + str.tostring(base_risk), text_color=text_color, bgcolor=color.new(color.yellow, 70), text_size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DD LEVELS (from highest to lowest)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+for i = 1 to levels_dd
+    row = levels_du + 1 + i
+    
+    // Calculate balance for DD level
+    balance = account_size - (i * level_step)
+    
+    // Calculate risk amount for DD level
+    raw_risk = base_risk - (i * risk_increment)
+    risk = math.max(min_risk, math.min(max_risk, raw_risk))
+    
+    // Display row
+    table.cell(risk_table, 0, row, "$" + str.tostring(balance), text_color=text_color, text_size=size.small)
+    table.cell(risk_table, 1, row, "$" + str.tostring(risk), text_color=text_color, text_size=size.small)
