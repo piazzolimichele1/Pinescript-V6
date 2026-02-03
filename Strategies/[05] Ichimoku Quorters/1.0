@@ -1,0 +1,223 @@
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     STRATEGY HEADER
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//@strategy_alert_message {{strategy.order.alert_message}}
+//@version=6
+strategy("Ichimoku Quarters - Michele Piazzoli 1.0", overlay=true, max_bars_back=5000, max_lines_count=500, max_labels_count=500, calc_on_every_tick=false, calc_on_order_fills=false, process_orders_on_close=true)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     MT5 SETTINGS (INPUT)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+userID = input.string("", "User ID", group="Expert Settings")  // MT5 user identification
+lotsize = input.string("", "Lot Size", group="Expert Settings")  // MT5 lot size for trade execution
+tradingsymbol = input.string("", "Trading Symbol", group="Expert Settings")  // MT5 symbol name
+takeprofitpips = input.string("", "TP Pips", group="Expert Settings")  // MT5 take profit in pips
+stoplosspips = input.string("", "SL Pips", group="Expert Settings")  // MT5 stop loss in pips
+tradecomment = input.string("", "Comment", group="Expert Settings")  // MT5 trade comment
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     MT5 MESSAGE CONSTRUCTION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+longentrymessage = '{"password":"Yourpasshere","timestamp":"{{timenow}}","UsedID":"'+userID+'","Openclose":"open","lots":"'+lotsize+'","direction":"buy","symbol":"'+tradingsymbol+'","takeprofitpips":"'+takeprofitpips+'","stoplosspips":"'+stoplosspips+'","comments":"'+tradecomment+'"}'  // JSON message for long entry alert
+shortentrymessage = '{"password":"Yourpasshere","timestamp":"{{timenow}}","UsedID":"'+userID+'","Openclose":"open","lots":"'+lotsize+'","direction":"sell","symbol":"'+tradingsymbol+'","takeprofitpips":"'+takeprofitpips+'","stoplosspips":"'+stoplosspips+'","comments":"'+tradecomment+'"}'  // JSON message for short entry alert
+longexitmessage = '{"password":"Yourpasshere","UsedID":"'+userID+'","Open/close":"close","lots":"'+lotsize+'","direction":"buy","symbol":"'+tradingsymbol+'","comments":"'+tradingsymbol+'"}'  // JSON message for long exit alert
+shortexitmessage = '{"password":"Yourpasshere","UsedID":"'+userID+'","Open/close":"close","lots":"'+lotsize+'","direction":"sell","symbol":"'+tradingsymbol+'","comments":"'+tradingsymbol+'"}'  // JSON message for short exit alert
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     SESSION TIMING INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+sessionstart = input.string("15:00", "Session Start", group="Session Time")  // Trading session start time in HH:MM format
+sessionend = input.string("18:00", "Session End", group="Session Time")  // Trading session end time in HH:MM format
+sessionbgcolor = input.color(color.orange, "Session Color", group="Session Time")  // Background color for active session
+
+sessionstartformatted = str.replace(sessionstart, ":", "")  // Remove colon from start time for session string
+sessionendformatted = str.replace(sessionend, ":", "")  // Remove colon from end time for session string
+tradingsession = sessionstartformatted + "-" + sessionendformatted + ":1234567"  // Build complete session string with all weekdays
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     POSITION SIZE
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+positionquantity = input.int(1, "Position Size", group="Position Settings")  // Number of contracts/lots per trade
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     QUARTILES FILTER SETTINGS (INPUT)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+quartile_tf_input = input.string("4 hours", "Quartile Timeframe", options=["15 minutes", "30 minutes", "45 minutes", "1 hour", "2 hours", "3 hours", "4 hours"], group="Quartiles Filter")  // Higher timeframe for round number crossing detection
+round_step = input.float(0.01, "Round Number Step", step=0.001, group="Quartiles Filter")  // Distance between round numbers (0.01 for forex major pairs, 0.001 for micro)
+
+quartile_tf = switch quartile_tf_input  // Convert display name to PineScript timeframe string
+    "15 minutes" => "15"
+    "30 minutes" => "30"
+    "45 minutes" => "45"
+    "1 hour" => "60"
+    "2 hours" => "120"
+    "3 hours" => "180"
+    "4 hours" => "240"
+    => "240"
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     EMA SETTINGS (INPUT)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+ema_length = input.int(50, "EMA Length", group="EMA Settings")  // EMA period for trend confirmation on entry timeframe
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     STOP LOSS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+stoploss = input.int(50, "Stop Loss (Pips)", group="Strategy Settings")  // Stop loss distance in pips
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     ICHIMOKU SETTINGS (INPUT)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+conversionPeriods = input.int(9, "Conversion Line Length", minval=1, group="Ichimoku Cloud Settings")  // Tenkan-Sen period
+basePeriods = input.int(26, "Base Line Length", minval=1, group="Ichimoku Cloud Settings")  // Kijun-Sen period
+laggingSpan2Periods = input.int(52, "Lagging Span B Length", minval=1, group="Ichimoku Cloud Settings")  // Senkou Span B period
+displacement = input.int(26, "Displacement", minval=1, group="Ichimoku Cloud Settings")  // Cloud displacement (Kumo shift)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     RISK REWARD SETTINGS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+RR = input.float(2.0, "RR", group="Strategy Settings")  // Risk to reward ratio for take profit calculation
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     WEEKDAY FILTER
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+tradingdays = (dayofweek == dayofweek.monday) or (dayofweek == dayofweek.tuesday) or (dayofweek == dayofweek.wednesday) or (dayofweek == dayofweek.thursday) or (dayofweek == dayofweek.friday)  // Only allow trades on weekdays
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DAYLIGHT SAVINGS TIME
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+timezonea = input("GMT+2", title="Time-Zone A(same year)", group="Daylight Savings")  // Timezone during daylight saving period
+startday = input.int(title="D:(Start)", defval=01, minval=1, maxval=31, inline='Start', group="Daylight Savings")  // Day when DST starts
+startmonth = input.int(title="M:(Start)", defval=04, minval=1, maxval=12, inline='Start', group="Daylight Savings")  // Month when DST starts
+endday = input.int(title="D:(End)", defval=26, minval=1, maxval=31, inline='End', group="Daylight Savings")  // Day when DST ends
+endmonth = input.int(title="M:(End)", defval=10, minval=1, maxval=12, inline='End', group="Daylight Savings")  // Month when DST ends
+inDateRangeCheck1 = (time >= timestamp(syminfo.timezone, year, startmonth, startday, 0, 0)) and (time < timestamp(syminfo.timezone, year, endmonth, endday, 0, 0))  // Check if current date falls within DST period
+
+timezoneB = input("GMT+1", title="Time-Zone B (Excluding Timezone A)", group="Daylight Savings")  // Timezone outside DST period
+timezone = inDateRangeCheck1 ? timezonea : timezoneB  // Select active timezone based on DST check
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     SESSION CHECK
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+sessionTime = time(timeframe.period, tradingsession, timezone)  // Check if current bar is within the trading session
+isInSession = na(sessionTime) ? false : true  // Boolean flag for session status
+bgcolor(isInSession ? color.new(sessionbgcolor, 90) : na)  // Highlight session period on chart
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     QUARTILES FILTER CALCULATION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+quartile_bias() =>  // Detects round number crossings on the selected HTF and returns directional bias
+    var int bias = 0  // Persistent bias variable: 1 for long, -1 for short
+
+    float c = close  // Current bar close price on the HTF
+    float o = open  // Current bar open price on the HTF
+
+    float round_above_open = math.ceil(o / round_step) * round_step  // Nearest round number above the open price
+    float round_below_open = math.floor(o / round_step) * round_step  // Nearest round number below the open price
+
+    bool crossed_up = o < round_above_open and c >= round_above_open  // Candle opened below a round number and closed above it
+    bool crossed_down = o > round_below_open and c <= round_below_open  // Candle opened above a round number and closed below it
+
+    if crossed_up  // Bullish crossing detected
+        bias := 1
+    if crossed_down  // Bearish crossing detected
+        bias := -1
+
+    bias  // Return current bias
+
+htf_bias = request.security(syminfo.tickerid, quartile_tf, quartile_bias())  // Retrieve quartile bias from the selected higher timeframe
+
+bullish_quartile_filter = htf_bias == 1  // HTF quartile bias is long
+bearish_quartile_filter = htf_bias == -1  // HTF quartile bias is short
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     ICHIMOKU CLOUD CALCULATION AND PLOT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+donchian(len) => math.avg(ta.lowest(len), ta.highest(len))  // Donchian channel midpoint used for Ichimoku lines
+
+conversionLine = donchian(conversionPeriods)  // Tenkan-Sen: short-term trend signal
+baseLine = donchian(basePeriods)  // Kijun-Sen: medium-term trend signal
+leadLine1 = math.avg(conversionLine, baseLine)  // Senkou Span A: average of conversion and base lines
+leadLine2 = donchian(laggingSpan2Periods)  // Senkou Span B: long-term trend boundary
+
+p1 = plot(leadLine1, offset=displacement - 1, color=#A5D6A7, title="Leading Span A", display=display.none)  // Senkou Span A plotted ahead by displacement
+p2 = plot(leadLine2, offset=displacement - 1, color=#EF9A9A, title="Leading Span B", display=display.none)  // Senkou Span B plotted ahead by displacement
+plot(leadLine1 > leadLine2 ? leadLine1 : leadLine2, offset=displacement - 1, title="Kumo Cloud Upper Line", display=display.none)  // Upper edge of the Kumo cloud
+plot(leadLine1 < leadLine2 ? leadLine1 : leadLine2, offset=displacement - 1, title="Kumo Cloud Lower Line", display=display.none)  // Lower edge of the Kumo cloud
+fill(p1, p2, color=leadLine1 > leadLine2 ? color.rgb(67, 160, 71, 90) : color.rgb(244, 67, 54, 90))  // Fill cloud green when bullish, red when bearish
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     EMA CALCULATION AND PLOT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+ema_line = ta.ema(close[1], ema_length)  // EMA calculated on previous close to avoid lookahead
+plot(ema_line, color=color.blue, linewidth=2, title="EMA")  // Plot EMA on chart
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     ICHIMOKU TRIGGER LEVELS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+long_trigger = math.min(leadLine1[displacement], leadLine2[displacement], ema_line)  // Long trigger: price must cross above the lowest of cloud edges and EMA
+short_trigger = math.max(leadLine1[displacement], leadLine2[displacement], ema_line)  // Short trigger: price must cross below the highest of cloud edges and EMA
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CROSSOVER STATE TRACKING
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var bool long_state_active = false  // Persistent flag: true when price crossed above short_trigger
+var bool short_state_active = false  // Persistent flag: true when price crossed below long_trigger
+
+if ta.crossover(close, short_trigger) and barstate.isconfirmed  // Price crosses above the upper trigger level
+    long_state_active := true  // Activate long state
+    short_state_active := false  // Deactivate short state
+
+if ta.crossunder(close, long_trigger) and barstate.isconfirmed  // Price crosses below the lower trigger level
+    long_state_active := false  // Deactivate long state
+    short_state_active := true  // Activate short state
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     ENTRY CONDITIONS WITH QUARTILES FILTER
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+longentrycondition = long_state_active and short_state_active[1] and isInSession and tradingdays and bullish_quartile_filter  // Ichimoku long signal + session + weekday + quartile bullish
+shortentrycondition = short_state_active and long_state_active[1] and isInSession and tradingdays and bearish_quartile_filter  // Ichimoku short signal + session + weekday + quartile bearish
+
+plotshape(longentrycondition and strategy.position_size == 0, style=shape.labelup, location=location.belowbar, color=color.green, text="BUY", textcolor=color.white, size=size.small)  // Buy signal label on chart
+plotshape(shortentrycondition and strategy.position_size == 0, style=shape.labeldown, location=location.abovebar, color=color.red, text="SELL", textcolor=color.white, size=size.small)  // Sell signal label on chart
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     POSITION VARIABLES
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var float longentryprice = 0.0  // Stored long entry price for SL/TP calculation
+var float shortentryprice = 0.0  // Stored short entry price for SL/TP calculation
+var float longstoploss = 0.0  // Long position stop loss level
+var float shortstoploss = 0.0  // Short position stop loss level
+var float longtakeprofit = 0.0  // Long position take profit level
+var float shorttakeprofit = 0.0  // Short position take profit level
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     STOP LOSS CALCULATION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+pip_value = syminfo.type == "forex" ? 0.0001 : syminfo.mintick  // Forex: 0.0001 standard pip. All other instruments: use mintick so 1 pip input = 1 point
+
+if syminfo.type == "forex" and str.contains(syminfo.ticker, "JPY")  // JPY pairs use 0.01 as pip value
+    pip_value := 0.01
+
+stoplossdistance = stoploss * pip_value  // Convert stop loss pips to price distance
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     ENTRY ORDERS EXECUTION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+if longentrycondition and strategy.position_size == 0  // Long entry: no existing position and all conditions met
+    longentryprice := close  // Store entry price at current close
+    longstoploss := longentryprice - stoplossdistance  // Calculate SL below entry
+    longtakeprofit := longentryprice + RR * stoplossdistance  // Calculate TP using risk reward ratio
+    strategy.order("Long Entry", strategy.long, positionquantity, comment="Buy", alert_message=longentrymessage)  // Submit long order with MT5 alert
+
+if shortentrycondition and strategy.position_size == 0  // Short entry: no existing position and all conditions met
+    shortentryprice := close  // Store entry price at current close
+    shortstoploss := shortentryprice + stoplossdistance  // Calculate SL above entry
+    shorttakeprofit := shortentryprice - RR * stoplossdistance  // Calculate TP using risk reward ratio
+    strategy.order("Short Entry", strategy.short, positionquantity, comment="Sell", alert_message=shortentrymessage)  // Submit short order with MT5 alert
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     EXIT ORDERS MANAGEMENT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+if strategy.position_size > 0  // Long position is open: manage TP and SL exits
+    longentryprice := strategy.position_avg_price  // Sync entry price with actual fill price
+    strategy.order("Long TP", strategy.short, positionquantity, limit=longtakeprofit, comment="Buy TP", oca_name="Long", oca_type=strategy.oca.cancel, disable_alert=true)  // Limit order at take profit level
+    strategy.order("Long SL", strategy.short, math.abs(strategy.position_size), stop=longstoploss, comment="Buy SL", oca_name="Long", oca_type=strategy.oca.cancel, disable_alert=true)  // Stop order at stop loss level
+
+if strategy.position_size < 0  // Short position is open: manage TP and SL exits
+    shortentryprice := strategy.position_avg_price  // Sync entry price with actual fill price
+    strategy.order("Short TP", strategy.long, positionquantity, limit=shorttakeprofit, comment="Sell TP", oca_name="Short", oca_type=strategy.oca.cancel, disable_alert=true)  // Limit order at take profit level
+    strategy.order("Short SL", strategy.long, math.abs(strategy.position_size), stop=shortstoploss, comment="Sell SL", oca_name="Short", oca_type=strategy.oca.cancel, disable_alert=true)  // Stop order at stop loss level
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     POSITION VISUALIZATION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+longsldrawn = plot(strategy.position_size > 0 ? longstoploss : na, color=color.red, linewidth=1, style=plot.style_linebr, title="Long Stop Loss")  // Long SL level line
+longentrydrawn = plot(strategy.position_size > 0 ? longentryprice : na, color=color.blue, linewidth=1, style=plot.style_linebr, title="Long Entry")  // Long entry level line
+longtpdrawn = plot(strategy.position_size > 0 ? longtakeprofit : na, color=color.green, linewidth=1, style=plot.style_linebr, title="Long Take Profit")  // Long TP level line
+
+shortsldrawn = plot(strategy.position_size < 0 ? shortstoploss : na, color=color.red, linewidth=1, style=plot.style_linebr, title="Short Stop Loss")  // Short SL level line
+shortentrydrawn = plot(strategy.position_size < 0 ? shortentryprice : na, color=color.blue, linewidth=1, style=plot.style_linebr, title="Short Entry")  // Short entry level line
+shorttpdrawn = plot(strategy.position_size < 0 ? shorttakeprofit : na, color=color.green, linewidth=1, style=plot.style_linebr, title="Short Take Profit")  // Short TP level line
+
+fill(longsldrawn, longentrydrawn, color=color.new(color.red, 85), title="Long Risk Zone")  // Red fill between entry and SL for long
+fill(shortsldrawn, shortentrydrawn, color=color.new(color.red, 85), title="Short Risk Zone")  // Red fill between entry and SL for short
+fill(longentrydrawn, longtpdrawn, color=color.new(color.green, 85), title="Long Reward Zone")  // Green fill between entry and TP for long
+fill(shortentrydrawn, shorttpdrawn, color=color.new(color.green, 85), title="Short Reward Zone")  // Green fill between entry and TP for short
