@@ -1,0 +1,142 @@
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     INDICATOR HEADER
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//@version=6
+indicator("Trade Checklist - Michele Piazzoli", overlay=true)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     TABLE SETTINGS INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+table_pos = input.string('Bottom Right', 'Table Position', options=['Top Right', 'Top Left', 'Bottom Right', 'Bottom Left'], group='Table Settings')  // Position of the checklist table on chart
+col_satisfied = input.color(#089981, 'Satisfied Color', group='Table Settings')  // Color when a confirmation is satisfied
+col_not_satisfied = input.color(#f23645, 'Not Satisfied Color', group='Table Settings')  // Color when a confirmation is not satisfied
+col_bg = input.color(#1e222d, 'Background Color', group='Table Settings')  // Table cell background color
+col_border = input.color(#373a46, 'Border Color', group='Table Settings')  // Table border color
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONFIRMATION 1 INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+c1_on = input.string('ON', 'Enable', options=['ON', 'OFF'], group='Confirmation 1')  // Dropdown ON/OFF to toggle confirmation 1
+c1_name = input.string('HTF Market Structure', 'Label', group='Confirmation 1')  // Text label displayed in the checklist
+c1_status = input.string('Not Satisfied', 'Status', options=['Satisfied', 'Not Satisfied'], group='Confirmation 1')  // Manual status selection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONFIRMATION 2 INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+c2_on = input.string('ON', 'Enable', options=['ON', 'OFF'], group='Confirmation 2')  // Dropdown ON/OFF to toggle confirmation 2
+c2_name = input.string('SMA 9 on Entry TF', 'Label', group='Confirmation 2')  // Text label displayed in the checklist
+c2_status = input.string('Not Satisfied', 'Status', options=['Satisfied', 'Not Satisfied'], group='Confirmation 2')  // Manual status selection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONFIRMATION 3 INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+c3_on = input.string('ON', 'Enable', options=['ON', 'OFF'], group='Confirmation 3')  // Dropdown ON/OFF to toggle confirmation 3
+c3_name = input.string('In Session', 'Label', group='Confirmation 3')  // Text label displayed in the checklist
+c3_status = input.string('Not Satisfied', 'Status', options=['Satisfied', 'Not Satisfied'], group='Confirmation 3')  // Manual status selection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONFIRMATION 4 INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+c4_on = input.string('OFF', 'Enable', options=['ON', 'OFF'], group='Confirmation 4')  // Dropdown ON/OFF to toggle confirmation 4
+c4_name = input.string('', 'Label', group='Confirmation 4')  // Text label displayed in the checklist
+c4_status = input.string('Not Satisfied', 'Status', options=['Satisfied', 'Not Satisfied'], group='Confirmation 4')  // Manual status selection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONFIRMATION 5 INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+c5_on = input.string('OFF', 'Enable', options=['ON', 'OFF'], group='Confirmation 5')  // Dropdown ON/OFF to toggle confirmation 5
+c5_name = input.string('', 'Label', group='Confirmation 5')  // Text label displayed in the checklist
+c5_status = input.string('Not Satisfied', 'Status', options=['Satisfied', 'Not Satisfied'], group='Confirmation 5')  // Manual status selection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONFIRMATION 6 INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+c6_on = input.string('OFF', 'Enable', options=['ON', 'OFF'], group='Confirmation 6')  // Dropdown ON/OFF to toggle confirmation 6
+c6_name = input.string('', 'Label', group='Confirmation 6')  // Text label displayed in the checklist
+c6_status = input.string('Not Satisfied', 'Status', options=['Satisfied', 'Not Satisfied'], group='Confirmation 6')  // Manual status selection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONFIRMATION 7 INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+c7_on = input.string('OFF', 'Enable', options=['ON', 'OFF'], group='Confirmation 7')  // Dropdown ON/OFF to toggle confirmation 7
+c7_name = input.string('', 'Label', group='Confirmation 7')  // Text label displayed in the checklist
+c7_status = input.string('Not Satisfied', 'Status', options=['Satisfied', 'Not Satisfied'], group='Confirmation 7')  // Manual status selection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONFIRMATION 8 INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+c8_on = input.string('OFF', 'Enable', options=['ON', 'OFF'], group='Confirmation 8')  // Dropdown ON/OFF to toggle confirmation 8
+c8_name = input.string('', 'Label', group='Confirmation 8')  // Text label displayed in the checklist
+c8_status = input.string('Not Satisfied', 'Status', options=['Satisfied', 'Not Satisfied'], group='Confirmation 8')  // Manual status selection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONFIRMATION 9 INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+c9_on = input.string('OFF', 'Enable', options=['ON', 'OFF'], group='Confirmation 9')  // Dropdown ON/OFF to toggle confirmation 9
+c9_name = input.string('', 'Label', group='Confirmation 9')  // Text label displayed in the checklist
+c9_status = input.string('Not Satisfied', 'Status', options=['Satisfied', 'Not Satisfied'], group='Confirmation 9')  // Manual status selection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONFIRMATION 10 INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+c10_on = input.string('OFF', 'Enable', options=['ON', 'OFF'], group='Confirmation 10')  // Dropdown ON/OFF to toggle confirmation 10
+c10_name = input.string('', 'Label', group='Confirmation 10')  // Text label displayed in the checklist
+c10_status = input.string('Not Satisfied', 'Status', options=['Satisfied', 'Not Satisfied'], group='Confirmation 10')  // Manual status selection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     TABLE POSITION CONVERSION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var t_pos = table_pos == 'Top Right' ? position.top_right : table_pos == 'Top Left' ? position.top_left : table_pos == 'Bottom Right' ? position.bottom_right : position.bottom_left  // Convert position string to table position constant
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     COUNT ACTIVE AND SATISFIED
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+active_count = (c1_on == 'ON' ? 1 : 0) + (c2_on == 'ON' ? 1 : 0) + (c3_on == 'ON' ? 1 : 0) + (c4_on == 'ON' ? 1 : 0) + (c5_on == 'ON' ? 1 : 0) + (c6_on == 'ON' ? 1 : 0) + (c7_on == 'ON' ? 1 : 0) + (c8_on == 'ON' ? 1 : 0) + (c9_on == 'ON' ? 1 : 0) + (c10_on == 'ON' ? 1 : 0)  // Total number of enabled confirmations
+satisfied_count = (c1_on == 'ON' and c1_status == 'Satisfied' ? 1 : 0) + (c2_on == 'ON' and c2_status == 'Satisfied' ? 1 : 0) + (c3_on == 'ON' and c3_status == 'Satisfied' ? 1 : 0) + (c4_on == 'ON' and c4_status == 'Satisfied' ? 1 : 0) + (c5_on == 'ON' and c5_status == 'Satisfied' ? 1 : 0) + (c6_on == 'ON' and c6_status == 'Satisfied' ? 1 : 0) + (c7_on == 'ON' and c7_status == 'Satisfied' ? 1 : 0) + (c8_on == 'ON' and c8_status == 'Satisfied' ? 1 : 0) + (c9_on == 'ON' and c9_status == 'Satisfied' ? 1 : 0) + (c10_on == 'ON' and c10_status == 'Satisfied' ? 1 : 0)  // Total number of satisfied confirmations
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     BUILD TABLE
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var table tb = table.new(t_pos, 2, 12, bgcolor=col_bg, border_color=col_border, border_width=1, frame_color=col_border, frame_width=1)  // Create table: 2 columns (label + status), 12 rows max (header + 10 confirmations + score)
+
+if barstate.islast  // Only draw table on the last bar for performance
+    row = 0  // Row counter
+
+    table.cell(tb, 0, row, '  TRADE CHECKLIST  ', text_color=color.white, text_size=size.normal)  // Header title cell
+    table.cell(tb, 1, row, str.tostring(satisfied_count) + '/' + str.tostring(active_count), text_color=satisfied_count == active_count ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Header score cell
+    row += 1  // Advance to next row
+
+    if c1_on == 'ON'  // Confirmation 1 row
+        table.cell(tb, 0, row, c1_name, text_color=color.white, text_size=size.normal, text_halign=text.align_left)  // Confirmation label
+        table.cell(tb, 1, row, c1_status == 'Satisfied' ? '✓' : '✗', text_color=c1_status == 'Satisfied' ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Status icon with color
+        row += 1
+
+    if c2_on == 'ON'  // Confirmation 2 row
+        table.cell(tb, 0, row, c2_name, text_color=color.white, text_size=size.normal, text_halign=text.align_left)  // Confirmation label
+        table.cell(tb, 1, row, c2_status == 'Satisfied' ? '✓' : '✗', text_color=c2_status == 'Satisfied' ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Status icon with color
+        row += 1
+
+    if c3_on == 'ON'  // Confirmation 3 row
+        table.cell(tb, 0, row, c3_name, text_color=color.white, text_size=size.normal, text_halign=text.align_left)  // Confirmation label
+        table.cell(tb, 1, row, c3_status == 'Satisfied' ? '✓' : '✗', text_color=c3_status == 'Satisfied' ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Status icon with color
+        row += 1
+
+    if c4_on == 'ON'  // Confirmation 4 row
+        table.cell(tb, 0, row, c4_name, text_color=color.white, text_size=size.normal, text_halign=text.align_left)  // Confirmation label
+        table.cell(tb, 1, row, c4_status == 'Satisfied' ? '✓' : '✗', text_color=c4_status == 'Satisfied' ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Status icon with color
+        row += 1
+
+    if c5_on == 'ON'  // Confirmation 5 row
+        table.cell(tb, 0, row, c5_name, text_color=color.white, text_size=size.normal, text_halign=text.align_left)  // Confirmation label
+        table.cell(tb, 1, row, c5_status == 'Satisfied' ? '✓' : '✗', text_color=c5_status == 'Satisfied' ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Status icon with color
+        row += 1
+
+    if c6_on == 'ON'  // Confirmation 6 row
+        table.cell(tb, 0, row, c6_name, text_color=color.white, text_size=size.normal, text_halign=text.align_left)  // Confirmation label
+        table.cell(tb, 1, row, c6_status == 'Satisfied' ? '✓' : '✗', text_color=c6_status == 'Satisfied' ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Status icon with color
+        row += 1
+
+    if c7_on == 'ON'  // Confirmation 7 row
+        table.cell(tb, 0, row, c7_name, text_color=color.white, text_size=size.normal, text_halign=text.align_left)  // Confirmation label
+        table.cell(tb, 1, row, c7_status == 'Satisfied' ? '✓' : '✗', text_color=c7_status == 'Satisfied' ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Status icon with color
+        row += 1
+
+    if c8_on == 'ON'  // Confirmation 8 row
+        table.cell(tb, 0, row, c8_name, text_color=color.white, text_size=size.normal, text_halign=text.align_left)  // Confirmation label
+        table.cell(tb, 1, row, c8_status == 'Satisfied' ? '✓' : '✗', text_color=c8_status == 'Satisfied' ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Status icon with color
+        row += 1
+
+    if c9_on == 'ON'  // Confirmation 9 row
+        table.cell(tb, 0, row, c9_name, text_color=color.white, text_size=size.normal, text_halign=text.align_left)  // Confirmation label
+        table.cell(tb, 1, row, c9_status == 'Satisfied' ? '✓' : '✗', text_color=c9_status == 'Satisfied' ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Status icon with color
+        row += 1
+
+    if c10_on == 'ON'  // Confirmation 10 row
+        table.cell(tb, 0, row, c10_name, text_color=color.white, text_size=size.normal, text_halign=text.align_left)  // Confirmation label
+        table.cell(tb, 1, row, c10_status == 'Satisfied' ? '✓' : '✗', text_color=c10_status == 'Satisfied' ? col_satisfied : col_not_satisfied, text_size=size.normal)  // Status icon with color
