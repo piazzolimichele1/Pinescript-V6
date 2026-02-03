@@ -1,0 +1,151 @@
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     INDICATOR HEADER
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//@version=6
+indicator("Market Structure - Michele Piazzoli", overlay=true, max_lines_count=500, max_labels_count=500)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     SETTINGS INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+contrary_threshold = input.int(2, 'Contrary Candles for Reversal', minval=2, maxval=5, group='Structure Settings')  // Number of consecutive contrary candles required to trigger a trend reversal
+show_bg = input.string('ON', 'Show Background', options=['ON', 'OFF'], group='Display Settings')  // Toggle background color for current trend
+show_lines = input.string('ON', 'Show Structure Lines', options=['ON', 'OFF'], group='Display Settings')  // Toggle horizontal structure lines
+show_labels = input.string('ON', 'Show Structure Labels', options=['ON', 'OFF'], group='Display Settings')  // Toggle HH/HL/LH/LL labels
+col_bull = input.color(color.green, 'Bullish Color', group='Display Settings')  // Color for bullish trend elements
+col_bear = input.color(color.red, 'Bearish Color', group='Display Settings')  // Color for bearish trend elements
+bg_transp = input.float(90, 'Background Transparency', group='Display Settings')  // Transparency level for background color
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     TREND TRACKING VARIABLES
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var string currentTrend = na  // Current market trend: "long" or "short"
+var string previousTrend = na  // Stores previous trend state before update to detect changes
+var int contraryCount = 0  // Counter for consecutive contrary candles
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DRAWING VARIABLES
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var line activeLine = na  // Currently active horizontal structure line
+var label activeLabel = na  // Currently active structure label (HH/HL/LH/LL)
+var float lineLevel = na  // Price level of the active structure line
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     COCH TRACKING VARIABLES
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var float retracementStartLevel = na  // Price level where the retracement originated, used for COCH detection
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     STRUCTURE HIGH/LOW TRACKING
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var float lastBodyHigh = na  // Previous structure high (body), used to determine HH or LH
+var float lastBodyLow = na  // Previous structure low (body), used to determine HL or LL
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CANDLE DIRECTION DETECTION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+float currentBodyHigh = math.max(open, close)  // Upper body level of current candle
+float currentBodyLow = math.min(open, close)  // Lower body level of current candle
+bool isBullishCandle = close > open  // Current candle is bullish (close above open)
+bool isBearishCandle = close < open  // Current candle is bearish (close below open)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     INITIAL TREND DETECTION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+if na(currentTrend)  // First bar: initialize trend based on candle direction
+    if isBullishCandle  // Bullish candle sets initial trend to long
+        currentTrend := "long"
+    else if isBearishCandle  // Bearish candle sets initial trend to short
+        currentTrend := "short"
+    else  // Doji defaults to long
+        currentTrend := "long"
+    lastBodyHigh := currentBodyHigh  // Initialize first structure high reference
+    lastBodyLow := currentBodyLow  // Initialize first structure low reference
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     STORE PREVIOUS TREND STATE
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+previousTrend := currentTrend  // Snapshot of trend before update logic, used to detect trend changes
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     STORE RETRACEMENT ORIGIN BEFORE RESET
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var float savedRetracementHigh = na  // Saved body high at the bar where contrary count started, captured before counter resets
+var float savedRetracementLow = na  // Saved body low at the bar where contrary count started, captured before counter resets
+
+if barstate.isconfirmed  // Capture retracement origin levels while counter is active, before it gets reset
+    if contraryCount == 0  // When counter is at zero, the next contrary candle starts from this bar
+        savedRetracementHigh := currentBodyHigh[0]  // Store body high of potential retracement start point
+        savedRetracementLow := currentBodyLow[0]  // Store body low of potential retracement start point
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     TREND UPDATE LOGIC (CONFIRMED BARS ONLY)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+if barstate.isconfirmed  // All trend logic executes only on confirmed (closed) bars
+    if currentTrend == "long"  // Current trend is bullish
+        bool cochShort = isBearishCandle and not na(retracementStartLevel) and currentBodyLow < retracementStartLevel  // COCH: bearish candle body breaks below retracement origin
+        if cochShort  // Immediate reversal via Change of Character
+            currentTrend := "short"  // Flip trend to short
+            contraryCount := 0  // Reset contrary counter
+            retracementStartLevel := na  // Clear retracement level after COCH triggers
+        else if isBearishCandle  // Bearish candle increments contrary counter
+            contraryCount += 1  // Add to consecutive contrary candle count
+            if contraryCount >= contrary_threshold  // Threshold reached: trend reversal
+                currentTrend := "short"  // Flip trend to short
+                retracementStartLevel := savedRetracementHigh  // Set retracement origin from saved level before counter was active
+                contraryCount := 0  // Reset contrary counter
+        else  // Bullish or doji candle resets contrary counter
+            contraryCount := 0  // Reset because streak is broken
+
+    else if currentTrend == "short"  // Current trend is bearish
+        bool cochLong = isBullishCandle and not na(retracementStartLevel) and currentBodyHigh > retracementStartLevel  // COCH: bullish candle body breaks above retracement origin
+        if cochLong  // Immediate reversal via Change of Character
+            currentTrend := "long"  // Flip trend to long
+            contraryCount := 0  // Reset contrary counter
+            retracementStartLevel := na  // Clear retracement level after COCH triggers
+        else if isBullishCandle  // Bullish candle increments contrary counter
+            contraryCount += 1  // Add to consecutive contrary candle count
+            if contraryCount >= contrary_threshold  // Threshold reached: trend reversal
+                currentTrend := "long"  // Flip trend to long
+                retracementStartLevel := savedRetracementLow  // Set retracement origin from saved level before counter was active
+                contraryCount := 0  // Reset contrary counter
+        else  // Bearish or doji candle resets contrary counter
+            contraryCount := 0  // Reset because streak is broken
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     BACKGROUND COLOR
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+bgcolor(show_bg == 'ON' ? (currentTrend == "long" ? color.new(col_bull, bg_transp) : color.new(col_bear, bg_transp)) : na)  // Green background for long, red for short
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DETECT TREND CHANGE
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+bool trendChanged = previousTrend != currentTrend and not na(previousTrend)  // True when trend flips on current bar
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DRAW STRUCTURE LINES AND LABELS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+if trendChanged  // Trend just changed: close previous line, draw new structure level
+    if not na(activeLine) and show_lines == 'ON'  // Close previous structure line at the bar before the change
+        line.set_x2(activeLine, bar_index[2])  // Terminate previous line two bars back
+    if not na(activeLabel) and show_labels == 'ON'  // Reposition previous label to match line end
+        label.set_x(activeLabel, bar_index[2])  // Move label to line end position
+
+    string structureType = na  // Holds the structure label text (HH, LH, HL, LL)
+
+    if currentTrend == "short"  // Transition from long to short: mark the swing high
+        lineLevel := math.max(open[1], close[1])  // Structure level is the body high of the bar before the reversal
+        if not na(lastBodyHigh)  // Compare with previous structure high
+            structureType := lineLevel > lastBodyHigh ? "HH" : "LH"  // Higher High or Lower High
+        else  // First structure point defaults to HH
+            structureType := "HH"
+        if show_lines == 'ON'  // Draw horizontal line at structure level
+            activeLine := line.new(bar_index[1], lineLevel, bar_index, lineLevel, color=col_bear, width=2)
+        if show_labels == 'ON'  // Draw structure type label
+            activeLabel := label.new(bar_index, lineLevel, structureType, color=col_bear, textcolor=color.white, style=label.style_label_left, size=size.small)
+        lastBodyHigh := lineLevel  // Update reference for next high comparison
+
+    else if currentTrend == "long"  // Transition from short to long: mark the swing low
+        lineLevel := math.min(open[1], close[1])  // Structure level is the body low of the bar before the reversal
+        if not na(lastBodyLow)  // Compare with previous structure low
+            structureType := lineLevel < lastBodyLow ? "LL" : "HL"  // Lower Low or Higher Low
+        else  // First structure point defaults to LL
+            structureType := "LL"
+        if show_lines == 'ON'  // Draw horizontal line at structure level
+            activeLine := line.new(bar_index[1], lineLevel, bar_index, lineLevel, color=col_bull, width=2)
+        if show_labels == 'ON'  // Draw structure type label
+            activeLabel := label.new(bar_index, lineLevel, structureType, color=col_bull, textcolor=color.white, style=label.style_label_left, size=size.small)
+        lastBodyLow := lineLevel  // Update reference for next low comparison
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     EXTEND ACTIVE LINE
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+if not trendChanged and not na(activeLine) and show_lines == 'ON'  // No trend change: extend current line to current bar
+    line.set_x2(activeLine, bar_index)  // Move line right edge to current bar index
+    if not na(activeLabel) and show_labels == 'ON'  // Move label along with the line
+        label.set_x(activeLabel, bar_index)  // Keep label at the right end of the line
