@@ -1,0 +1,261 @@
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     INDICATOR HEADER
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//@version=6
+indicator("Sessions - Michele Piazzoli", overlay=true, max_bars_back=500, max_boxes_count=500, max_labels_count=500)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     PIP SIZE FUNCTION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+GetPipSize() =>  // Returns the value of 1 pip based on instrument type
+    syminfo.mintick * (syminfo.type == "forex" ? 10 : 1)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     ASIAN SESSION INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+show_asian = input.string('ON', 'Show Session', options=['ON', 'OFF'], group='Asian Session')  // Dropdown ON/OFF to toggle Asian session visibility
+asian_ses = input.session('0000-0900', 'Session Time', group='Asian Session')  // Asian session time window
+asian_css = input.color(#e91e63, 'Session Color', group='Asian Session')  // Asian session color
+asian_pips = input.string('ON', 'Show Pips Range', options=['ON', 'OFF'], group='Asian Session')  // Dropdown ON/OFF to toggle pips range label
+asian_box_type = input.string('Static Box', 'Box Type', options=['Static Box', 'Dynamic Box'], group='Asian Session')  // Static: fixed rectangle | Dynamic: fill follows candle highs/lows
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     LONDON SESSION INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+show_london = input.string('ON', 'Show Session', options=['ON', 'OFF'], group='London Session')  // Dropdown ON/OFF to toggle London session visibility
+london_ses = input.session('0700-1600', 'Session Time', group='London Session')  // London session time window
+london_css = input.color(#2157f3, 'Session Color', group='London Session')  // London session color
+london_pips = input.string('ON', 'Show Pips Range', options=['ON', 'OFF'], group='London Session')  // Dropdown ON/OFF to toggle pips range label
+london_box_type = input.string('Static Box', 'Box Type', options=['Static Box', 'Dynamic Box'], group='London Session')  // Static: fixed rectangle | Dynamic: fill follows candle highs/lows
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     NEW YORK SESSION INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+show_ny = input.string('ON', 'Show Session', options=['ON', 'OFF'], group='New York Session')  // Dropdown ON/OFF to toggle New York session visibility
+ny_ses = input.session('1300-2200', 'Session Time', group='New York Session')  // New York session time window
+ny_css = input.color(#ff5d00, 'Session Color', group='New York Session')  // New York session color
+ny_pips = input.string('ON', 'Show Pips Range', options=['ON', 'OFF'], group='New York Session')  // Dropdown ON/OFF to toggle pips range label
+ny_box_type = input.string('Static Box', 'Box Type', options=['Static Box', 'Dynamic Box'], group='New York Session')  // Static: fixed rectangle | Dynamic: fill follows candle highs/lows
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     TIMEZONE INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+tz_incr = input.int(1, 'UTC (+/-)', group='Timezone')  // UTC offset, default UTC+1
+use_exchange = input.bool(true, 'Use Exchange Timezone', group='Timezone')  // Use exchange timezone, enabled by default
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DISPLAY SETTINGS INPUT
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+bg_transp = input.float(90, 'Box Transparency', group='Display Settings')  // Transparency level for session box/fill
+show_label = input.bool(true, 'Show Session Label', group='Display Settings')  // Toggle session name label above box
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     TIMEZONE CALCULATION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+n = bar_index  // Current bar index used for positioning drawings
+var tz = use_exchange ? syminfo.timezone : str.format('UTC{0}{1}', tz_incr >= 0 ? '+' : '-', math.abs(tz_incr))  // Build timezone string from input or use exchange tz
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     CONVERT DROPDOWN TO BOOL
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+bool asian_visible = show_asian == 'ON'  // Convert string dropdown to bool for Asian session
+bool london_visible = show_london == 'ON'  // Convert string dropdown to bool for London session
+bool ny_visible = show_ny == 'ON'  // Convert string dropdown to bool for New York session
+bool asian_pips_on = asian_pips == 'ON'  // Convert string dropdown to bool for Asian pips
+bool london_pips_on = london_pips == 'ON'  // Convert string dropdown to bool for London pips
+bool ny_pips_on = ny_pips == 'ON'  // Convert string dropdown to bool for New York pips
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     SESSION DETECTION HELPERS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+tf = timeframe.period  // Current chart timeframe
+res = "D"  // Resolution for newbar detection
+
+is_newbar(sess) =>  // Returns true on the first bar of a new session instance
+    t = time(res, sess, tz)  // Get time of session on daily resolution
+    na(t[1]) and not na(t) or t[1] < t  // True when session time transitions from na to valid or jumps forward
+
+is_session(sess) =>  // Returns true if current bar is inside the session
+    not na(time(timeframe.period, sess, tz))  // Not na means bar falls within session window
+
+is_asian_session = math.sign(nz(time(tf, asian_ses, tz)))  // 1 if inside Asian session, 0 otherwise (used for static box)
+is_london_session = math.sign(nz(time(tf, london_ses, tz)))  // 1 if inside London session, 0 otherwise (used for static box)
+is_ny_session = math.sign(nz(time(tf, ny_ses, tz)))  // 1 if inside New York session, 0 otherwise (used for static box)
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     STATIC BOX FUNCTION
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+get_static_range(session, session_name, session_css, show_pips_on) =>  // Draws a single fixed rectangle spanning the entire session from highest high to lowest low
+    var t = 0  // Stores session start time for label centering
+    var float max = high  // Tracks session high
+    var float min = low  // Tracks session low
+    var box bx = na  // Box drawing object
+    var label lbl = na  // Session name label
+    var label pip_lbl = na  // Pips range label below box
+
+    if session > session[1]  // Session just started (transition from 0 to 1)
+        t := time  // Store start time
+        max := high  // Initialize max with current high
+        min := low  // Initialize min with current low
+        bx := box.new(n, max, n, min, bgcolor=color.new(session_css, bg_transp), border_color=na)  // Create new box with no outline
+        if show_label  // Create session name label if enabled
+            lbl := label.new(t, max, session_name, xloc=xloc.bar_time, textcolor=session_css, style=label.style_label_down, color=color.new(color.white, 100), size=size.tiny)
+        if show_pips_on  // Create pips range label if enabled
+            pip_lbl := label.new(t, min, '', xloc=xloc.bar_time, textcolor=session_css, style=label.style_label_up, color=color.new(color.white, 100), size=size.tiny)
+
+    if session != 0 and session == session[1]  // Session is ongoing (still inside)
+        max := math.max(high, max)  // Update session high if current high is higher
+        min := math.min(low, min)  // Update session low if current low is lower
+        box.set_top(bx, max)  // Update box top to new high
+        box.set_rightbottom(bx, n, min)  // Update box right edge and bottom to new low
+        if show_label  // Update label position to center of session
+            label.set_xy(lbl, int(math.avg(t, time)), max)
+        if show_pips_on  // Update pips label position and text
+            float range_pips = (max - min) / GetPipSize()  // Calculate range in pips
+            label.set_xy(pip_lbl, int(math.avg(t, time)), min)  // Center label below box
+            label.set_text(pip_lbl, str.tostring(range_pips, '#.#') + ' pips')  // Display pips value
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DYNAMIC SESSION: ASIAN HIGH/LOW TRACKING
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+asianNewbar = is_newbar(asian_ses)  // True on first bar of new Asian session
+asianSession = is_session(asian_ses)  // True if current bar is inside Asian session
+
+float asianLow = na  // Tracks running low of Asian session
+asianLow := if asianSession  // Only update during session
+    if asianNewbar  // First bar of session: initialize with current low
+        low
+    else
+        math.min(nz(asianLow[1], low), low)  // Ongoing: keep the lowest low
+else
+    asianLow[1]  // Outside session: carry forward last value
+
+float asianHigh = na  // Tracks running high of Asian session
+asianHigh := if asianSession  // Only update during session
+    if asianNewbar  // First bar of session: initialize with current high
+        high
+    else
+        math.max(nz(asianHigh[1], high), high)  // Ongoing: keep the highest high
+else
+    asianHigh[1]  // Outside session: carry forward last value
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DYNAMIC SESSION: LONDON HIGH/LOW TRACKING
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+londonNewbar = is_newbar(london_ses)  // True on first bar of new London session
+londonSession = is_session(london_ses)  // True if current bar is inside London session
+
+float londonLow = na  // Tracks running low of London session
+londonLow := if londonSession  // Only update during session
+    if londonNewbar  // First bar: initialize
+        low
+    else
+        math.min(nz(londonLow[1], low), low)  // Ongoing: keep lowest
+else
+    londonLow[1]  // Outside: carry forward
+
+float londonHigh = na  // Tracks running high of London session
+londonHigh := if londonSession  // Only update during session
+    if londonNewbar  // First bar: initialize
+        high
+    else
+        math.max(nz(londonHigh[1], high), high)  // Ongoing: keep highest
+else
+    londonHigh[1]  // Outside: carry forward
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DYNAMIC SESSION: NEW YORK HIGH/LOW TRACKING
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+nyNewbar = is_newbar(ny_ses)  // True on first bar of new NY session
+nySession = is_session(ny_ses)  // True if current bar is inside NY session
+
+float nyLow = na  // Tracks running low of NY session
+nyLow := if nySession  // Only update during session
+    if nyNewbar  // First bar: initialize
+        low
+    else
+        math.min(nz(nyLow[1], low), low)  // Ongoing: keep lowest
+else
+    nyLow[1]  // Outside: carry forward
+
+float nyHigh = na  // Tracks running high of NY session
+nyHigh := if nySession  // Only update during session
+    if nyNewbar  // First bar: initialize
+        high
+    else
+        math.max(nz(nyHigh[1], high), high)  // Ongoing: keep highest
+else
+    nyHigh[1]  // Outside: carry forward
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DYNAMIC SESSION: PLOT AND FILL ASIAN
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+plotAsianL = plot(asianSession and asian_visible and asian_box_type == 'Dynamic Box' ? asianLow : na, color=color.new(#000000, 100), display=display.none)  // Plot Asian low line (invisible, used for fill)
+plotAsianH = plot(asianSession and asian_visible and asian_box_type == 'Dynamic Box' ? asianHigh : na, color=color.new(#000000, 100), display=display.none)  // Plot Asian high line (invisible, used for fill)
+fill(plotAsianL, plotAsianH, color=asianSession and asian_visible and asian_box_type == 'Dynamic Box' ? color.new(asian_css, bg_transp) : na)  // Fill between high and low with session color
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DYNAMIC SESSION: PLOT AND FILL LONDON
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+plotLondonL = plot(londonSession and london_visible and london_box_type == 'Dynamic Box' ? londonLow : na, color=color.new(#000000, 100), display=display.none)  // Plot London low line (invisible, used for fill)
+plotLondonH = plot(londonSession and london_visible and london_box_type == 'Dynamic Box' ? londonHigh : na, color=color.new(#000000, 100), display=display.none)  // Plot London high line (invisible, used for fill)
+fill(plotLondonL, plotLondonH, color=londonSession and london_visible and london_box_type == 'Dynamic Box' ? color.new(london_css, bg_transp) : na)  // Fill between high and low with session color
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DYNAMIC SESSION: PLOT AND FILL NEW YORK
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+plotNYL = plot(nySession and ny_visible and ny_box_type == 'Dynamic Box' ? nyLow : na, color=color.new(#000000, 100), display=display.none)  // Plot NY low line (invisible, used for fill)
+plotNYH = plot(nySession and ny_visible and ny_box_type == 'Dynamic Box' ? nyHigh : na, color=color.new(#000000, 100), display=display.none)  // Plot NY high line (invisible, used for fill)
+fill(plotNYL, plotNYH, color=nySession and ny_visible and ny_box_type == 'Dynamic Box' ? color.new(ny_css, bg_transp) : na)  // Fill between high and low with session color
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DYNAMIC SESSION: PIPS LABELS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+var label asian_dyn_lbl = na  // Asian dynamic session name label
+var label asian_dyn_pip = na  // Asian dynamic pips label
+var int asian_dyn_t = 0  // Asian dynamic session start time
+
+if asian_visible and asian_box_type == 'Dynamic Box'  // Only process when dynamic mode is active
+    if asianNewbar and asianSession  // New session started
+        asian_dyn_t := time  // Store start time
+        if show_label  // Create name label
+            asian_dyn_lbl := label.new(time, asianHigh, 'Asian', xloc=xloc.bar_time, textcolor=asian_css, style=label.style_label_down, color=color.new(color.white, 100), size=size.tiny)
+        if asian_pips_on  // Create pips label
+            asian_dyn_pip := label.new(time, asianLow, '', xloc=xloc.bar_time, textcolor=asian_css, style=label.style_label_up, color=color.new(color.white, 100), size=size.tiny)
+    if asianSession and not asianNewbar  // Session ongoing
+        if show_label  // Update name label position
+            label.set_xy(asian_dyn_lbl, int(math.avg(asian_dyn_t, time)), asianHigh)
+        if asian_pips_on  // Update pips label
+            float rng = (asianHigh - asianLow) / GetPipSize()  // Calculate range in pips
+            label.set_xy(asian_dyn_pip, int(math.avg(asian_dyn_t, time)), asianLow)  // Center below session
+            label.set_text(asian_dyn_pip, str.tostring(rng, '#.#') + ' pips')  // Display value
+
+var label london_dyn_lbl = na  // London dynamic session name label
+var label london_dyn_pip = na  // London dynamic pips label
+var int london_dyn_t = 0  // London dynamic session start time
+
+if london_visible and london_box_type == 'Dynamic Box'  // Only process when dynamic mode is active
+    if londonNewbar and londonSession  // New session started
+        london_dyn_t := time  // Store start time
+        if show_label  // Create name label
+            london_dyn_lbl := label.new(time, londonHigh, 'London', xloc=xloc.bar_time, textcolor=london_css, style=label.style_label_down, color=color.new(color.white, 100), size=size.tiny)
+        if london_pips_on  // Create pips label
+            london_dyn_pip := label.new(time, londonLow, '', xloc=xloc.bar_time, textcolor=london_css, style=label.style_label_up, color=color.new(color.white, 100), size=size.tiny)
+    if londonSession and not londonNewbar  // Session ongoing
+        if show_label  // Update name label position
+            label.set_xy(london_dyn_lbl, int(math.avg(london_dyn_t, time)), londonHigh)
+        if london_pips_on  // Update pips label
+            float rng = (londonHigh - londonLow) / GetPipSize()  // Calculate range in pips
+            label.set_xy(london_dyn_pip, int(math.avg(london_dyn_t, time)), londonLow)  // Center below session
+            label.set_text(london_dyn_pip, str.tostring(rng, '#.#') + ' pips')  // Display value
+
+var label ny_dyn_lbl = na  // NY dynamic session name label
+var label ny_dyn_pip = na  // NY dynamic pips label
+var int ny_dyn_t = 0  // NY dynamic session start time
+
+if ny_visible and ny_box_type == 'Dynamic Box'  // Only process when dynamic mode is active
+    if nyNewbar and nySession  // New session started
+        ny_dyn_t := time  // Store start time
+        if show_label  // Create name label
+            ny_dyn_lbl := label.new(time, nyHigh, 'New York', xloc=xloc.bar_time, textcolor=ny_css, style=label.style_label_down, color=color.new(color.white, 100), size=size.tiny)
+        if ny_pips_on  // Create pips label
+            ny_dyn_pip := label.new(time, nyLow, '', xloc=xloc.bar_time, textcolor=ny_css, style=label.style_label_up, color=color.new(color.white, 100), size=size.tiny)
+    if nySession and not nyNewbar  // Session ongoing
+        if show_label  // Update name label position
+            label.set_xy(ny_dyn_lbl, int(math.avg(ny_dyn_t, time)), nyHigh)
+        if ny_pips_on  // Update pips label
+            float rng = (nyHigh - nyLow) / GetPipSize()  // Calculate range in pips
+            label.set_xy(ny_dyn_pip, int(math.avg(ny_dyn_t, time)), nyLow)  // Center below session
+            label.set_text(ny_dyn_pip, str.tostring(rng, '#.#') + ' pips')  // Display value
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+//                     DRAW STATIC SESSIONS
+//══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+if asian_visible and asian_box_type == 'Static Box'  // Draw Asian static box if session is ON and static selected
+    get_static_range(is_asian_session, 'Asian', asian_css, asian_pips_on)
+if london_visible and london_box_type == 'Static Box'  // Draw London static box if session is ON and static selected
+    get_static_range(is_london_session, 'London', london_css, london_pips_on)
+if ny_visible and ny_box_type == 'Static Box'  // Draw NY static box if session is ON and static selected
+    get_static_range(is_ny_session, 'New York', ny_css, ny_pips_on)
