@@ -1,5 +1,5 @@
 //@version=6
-indicator("Risk Management", overlay=true)
+indicator("Risk Management - Michele Piazzoli 1.0", overlay=true)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ACCOUNT SETTINGS
