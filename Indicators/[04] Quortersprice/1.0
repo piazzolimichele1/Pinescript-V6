@@ -1,5 +1,5 @@
 //@version=6
-indicator("Quartile Price Levels - Michele Piazzoli", overlay=true, max_lines_count=500)
+indicator("Quartile Price Levels - Michele Piazzoli 1.0", overlay=true, max_lines_count=500)
 
 //══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 //                     GENERAL SETTINGS
